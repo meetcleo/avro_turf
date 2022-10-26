@@ -1,8 +1,6 @@
-require 'excon'
+require 'avro_turf/connection_manager'
 
 class AvroTurf::ConfluentSchemaRegistry
-  CONTENT_TYPE = "application/vnd.schemaregistry.v1+json".freeze
-
   def initialize(
     url,
     logger: Logger.new($stdout),
@@ -15,17 +13,17 @@ class AvroTurf::ConfluentSchemaRegistry
     client_key_pass: nil,
     client_cert_data: nil,
     client_key_data: nil,
+    oauth_url: nil,
+    oauth_client_id: nil,
+    oauth_client_secret: nil,
     path_prefix: nil
   )
     @path_prefix = path_prefix
     @logger = logger
-    headers = {
-      "Content-Type" => CONTENT_TYPE
-    }
-    headers[:proxy] = proxy unless proxy.nil?
-    @connection = Excon.new(
+    @connection_manager = ::AvroTurf::ConnectionManager.new(
       url,
-      headers: headers,
+      logger: logger,
+      proxy: proxy,
       user: user,
       password: password,
       ssl_ca_file: ssl_ca_file,
@@ -33,7 +31,10 @@ class AvroTurf::ConfluentSchemaRegistry
       client_key: client_key,
       client_key_pass: client_key_pass,
       client_cert_data: client_cert_data,
-      client_key_data: client_key_data
+      client_key_data: client_key_data,
+      oauth_url: oauth_url,
+      oauth_client_id: oauth_client_id,
+      oauth_client_secret: oauth_client_secret
     )
   end
 
@@ -123,9 +124,11 @@ class AvroTurf::ConfluentSchemaRegistry
   end
 
   def request(path, **options)
-    options = { expects: 200 }.merge!(options)
-    path = File.join(@path_prefix, path) unless @path_prefix.nil?
-    response = @connection.request(path: path, **options)
-    JSON.parse(response.body)
+    @connection_manager.with_connection do |connection|
+      options = { expects: 200 }.merge!(options)
+      path = File.join(@path_prefix, path) unless @path_prefix.nil?
+      response = connection.request(path: path, **options)
+      JSON.parse(response.body)
+    end
   end
 end
