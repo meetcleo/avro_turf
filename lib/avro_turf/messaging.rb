@@ -120,14 +120,16 @@ class AvroTurf
     # validate    - The boolean for performing complete message validation before
     #               encoding it, Avro::SchemaValidator::ValidationError with
     #               a descriptive message will be raised in case of invalid message.
+    # register    - The boolean for determining if registering a new schema is allowed
+    #               when encoding a message
     #
     # Returns the encoded data as a String.
-    def encode(message, schema_name: nil, namespace: @namespace, subject: nil, version: nil, schema_id: nil, validate: false)
+    def encode(message, schema_name: nil, namespace: @namespace, subject: nil, version: nil, schema_id: nil, validate: false, register: true)
       schema, schema_id = if schema_id
         fetch_schema_by_id(schema_id)
       elsif subject && version
         fetch_schema(subject: subject, version: version)
-      elsif schema_name
+      elsif schema_name && register
         register_schema(subject: subject, schema_name: schema_name, namespace: namespace)
       else
         raise ArgumentError.new('Neither schema_name nor schema_id nor subject + version provided to determine the schema.')
