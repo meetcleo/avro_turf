@@ -1,8 +1,18 @@
 # This shared example expects a registry variable to be defined
 # with an instance of the registry class being tested.
-shared_examples_for "a confluent schema registry client" do
+shared_examples_for "a confluent schema registry client" do |auth_mechanism|
   let(:logger) { Logger.new(StringIO.new) }
   let(:registry_url) { "http://registry.example.com" }
+  let(:oauth_url) { "https://oauth.example.com/auth" }
+  let(:oauth_token) { "test_token" }
+  let(:oauth_response) { <<-RESP
+      {
+        "access_token":"#{oauth_token}",
+        "expires_in":3600,
+        "token_type":"Bearer"
+      }
+    RESP
+  }
   let(:subject_name) { "some-subject" }
   let(:schema) do
     {
@@ -15,8 +25,25 @@ shared_examples_for "a confluent schema registry client" do
   end
 
   before do
-    stub_request(:any, /^#{registry_url}/).to_rack(FakeConfluentSchemaRegistryServer)
-    FakeConfluentSchemaRegistryServer.clear
+    fake_registry_server_klass = nil
+    if auth_mechanism == 'oauth'
+      fake_registry_server_klass = FakeConfluentSchemaRegistryServerWithOauth
+
+      stub_request(:post, oauth_url).
+        with(
+          body: {"grant_type"=>"client_credentials"},
+          headers: {
+          'Authorization'=>'Basic dGVzdCBvYXV0aF9jbGllbnRfaWQ6dGVzdCBvYXV0aF9jbGllbnRfc2VjcmV0',
+          'Content-Type'=>'application/x-www-form-urlencoded',
+          'Host'=>'oauth.example.com:443'
+          }).
+        to_return(status: 200, body: oauth_response, headers: {})
+    else
+      fake_registry_server_klass = FakeConfluentSchemaRegistryServer
+    end
+
+    stub_request(:any, /^#{registry_url}/).to_rack(fake_registry_server_klass)
+    fake_registry_server_klass.clear
   end
 
   describe "#register and #fetch" do
@@ -187,7 +214,7 @@ shared_examples_for "a confluent schema registry client" do
     end
 
     it "returns the global configuration" do
-      expect(registry.global_config).to eq(JSON.parse(expected))
+      expect(registry.global_config).to eq(maybe_include_auth_header_in_expected_config(JSON.parse(expected), auth_mechanism))
     end
   end
 
@@ -198,8 +225,8 @@ shared_examples_for "a confluent schema registry client" do
     let(:expected) { config.to_json }
 
     it "updates the global configuration and returns it" do
-      expect(registry.update_global_config(config)).to eq(JSON.parse(expected))
-      expect(registry.global_config).to eq(JSON.parse(expected))
+      expect(registry.update_global_config(config)).to eq(maybe_include_auth_header_in_expected_config(JSON.parse(expected), auth_mechanism))
+      expect(registry.global_config).to eq(maybe_include_auth_header_in_expected_config(JSON.parse(expected), auth_mechanism))
     end
   end
 
@@ -210,7 +237,7 @@ shared_examples_for "a confluent schema registry client" do
 
     context "when the subject config is not set" do
       it "returns the global configuration" do
-        expect(registry.subject_config(subject_name)).to eq(JSON.parse(expected))
+        expect(registry.subject_config(subject_name)).to eq(maybe_include_auth_header_in_expected_config(JSON.parse(expected), auth_mechanism))
       end
     end
 
@@ -242,6 +269,26 @@ shared_examples_for "a confluent schema registry client" do
     end
   end
 
+  describe "token refresh" do
+    let(:expected) do
+      { compatibility: 'BACKWARD' }.to_json
+    end
+
+    context "when the response is unauthorized" do
+      it "tries to fetch a new authorization token 3 times" do
+        skip('Not using oauth') if auth_mechanism != 'oauth'
+
+        allow(logger).to receive(:info)
+        expect{registry.subject_config('unauthorized')}.to raise_error(Excon::Error::Unauthorized)
+
+        expect(logger).to have_received(:info).with('Encountered unauthorised response, will retry with fresh token (3 retries remaining)...').exactly(1).times
+        expect(logger).to have_received(:info).with('Encountered unauthorised response, will retry with fresh token (2 retries remaining)...').exactly(1).times
+        expect(logger).to have_received(:info).with('Encountered unauthorised response, will retry with fresh token (1 retries remaining)...').exactly(1).times
+
+      end
+    end
+  end
+
   # Monkey patch an Avro::Schema to simulate the presence of
   # active_support/core_ext.
   def break_to_json(avro_schema)
@@ -250,5 +297,11 @@ shared_examples_for "a confluent schema registry client" do
         result[ivar.to_s.sub('@', '')] = instance_variable_get(ivar)
       end.to_json(*args)
     end
+  end
+
+  # Cheeky way to assert if the right auth header was passed when using oauth
+  def maybe_include_auth_header_in_expected_config(config, auth_mechanism)
+    config = config.merge("HTTP_AUTHORIZATION" => "Bearer #{oauth_token}") if auth_mechanism == "oauth"
+    config
   end
 end

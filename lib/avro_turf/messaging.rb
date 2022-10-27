@@ -55,6 +55,9 @@ class AvroTurf
     # client_key_pass      - Password to go with client_key (optional).
     # client_cert_data     - In-memory client certificate (optional).
     # client_key_data      - In-memory client private key to go with client_cert_data (optional).
+    # oauth_url            - URL at which an oauth token can be generated
+    # oauth_client_id      - id/secret combination that can be used to generate a temporary oauth token
+    # oauth_client_secret  - id/secret combination that can be used to generate a temporary oauth token
     def initialize(
       registry: nil,
       registry_url: nil,
@@ -71,7 +74,10 @@ class AvroTurf
       client_key: nil,
       client_key_pass: nil,
       client_cert_data: nil,
-      client_key_data: nil
+      client_key_data: nil,
+      oauth_url: nil,
+      oauth_client_id: nil,
+      oauth_client_secret: nil
     )
       @logger = logger || Logger.new($stderr)
       @namespace = namespace
@@ -89,6 +95,9 @@ class AvroTurf
           client_key_pass: client_key_pass,
           client_cert_data: client_cert_data,
           client_key_data: client_key_data,
+          oauth_url: oauth_url,
+          oauth_client_id: oauth_client_id,
+          oauth_client_secret: oauth_client_secret,
           path_prefix: registry_path_prefix
         )
       )
@@ -111,14 +120,16 @@ class AvroTurf
     # validate    - The boolean for performing complete message validation before
     #               encoding it, Avro::SchemaValidator::ValidationError with
     #               a descriptive message will be raised in case of invalid message.
+    # register    - The boolean for determining if registering a new schema is allowed
+    #               when encoding a message
     #
     # Returns the encoded data as a String.
-    def encode(message, schema_name: nil, namespace: @namespace, subject: nil, version: nil, schema_id: nil, validate: false)
+    def encode(message, schema_name: nil, namespace: @namespace, subject: nil, version: nil, schema_id: nil, validate: false, register: true)
       schema, schema_id = if schema_id
         fetch_schema_by_id(schema_id)
       elsif subject && version
         fetch_schema(subject: subject, version: version)
-      elsif schema_name
+      elsif schema_name && register
         register_schema(subject: subject, schema_name: schema_name, namespace: namespace)
       else
         raise ArgumentError.new('Neither schema_name nor schema_id nor subject + version provided to determine the schema.')

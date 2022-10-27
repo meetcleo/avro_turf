@@ -274,3 +274,17 @@ end
 
 # Messaging objects created with the same registry_url will now use the fake server.
 ```
+
+### Cognito (Oauth) Compatibility
+
+Connection to the schema registry can work with Cognito OAuth. It will request an auth token the first time it connects to the registry and will attempt to refresh the token when it expires. Pass the following arguments to use OAuth:
+
+```ruby
+avro = AvroTurf::Messaging.new(
+  logger: ...,
+  registry_url: ...,
+  oauth_url: <the authorisation server URL>,
+  oauth_client_id: <the oauth client id>,
+  oauth_client_secret: <the oauth client secret>
+)
+```
