@@ -23,7 +23,6 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
     @semaphore = Mutex.new
     @logger = logger
     @refresh_token_retries_remaining = REFRESH_TOKEN_TRIES
-    refresh_token
 
     super(url,
       logger: logger,

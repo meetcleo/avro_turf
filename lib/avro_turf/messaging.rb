@@ -104,6 +104,9 @@ class AvroTurf
       @schemas_by_id = {}
     end
 
+    attr_accessor :schema_store
+    attr_reader :registry
+
     # Encodes a message using the specified schema.
     #
     # message     - The message that should be encoded. Must be compatible with
