@@ -109,6 +109,11 @@ class AvroTurf::ConfluentSchemaRegistry
     put("/config/#{subject}", body: config.to_json)
   end
 
+  # Delete all versions for a subject
+  def delete_subject(subject)
+    delete("/subjects/#{subject}")
+  end
+
   private
 
   def get(path, **options)
@@ -121,6 +126,10 @@ class AvroTurf::ConfluentSchemaRegistry
 
   def post(path, **options)
     request(path, method: :post, **options)
+  end
+
+  def delete(path, **options)
+    request(path, method: :delete, **options)
   end
 
   def request(path, **options)
