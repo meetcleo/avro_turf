@@ -31,6 +31,21 @@ class FakeConfluentSchemaRegistryServer < Sinatra::Base
     def global_config
       self.class.global_config
     end
+
+    def schema_and_id_at_subject_and_version
+      schema_ids = SUBJECTS[params[:subject]]
+      halt(404, SUBJECT_NOT_FOUND) if schema_ids.empty?
+
+      schema_id = if params[:version] == 'latest'
+                    schema_ids.last
+                  else
+                    schema_ids.at(Integer(params[:version]) - 1)
+                  end
+      halt(404, VERSION_NOT_FOUND) unless schema_id
+
+      schema = SCHEMAS.at(schema_id)
+      [schema, schema_id]
+    end
   end
 
   post "/subjects/:subject/versions" do
@@ -69,17 +84,8 @@ class FakeConfluentSchemaRegistryServer < Sinatra::Base
   end
 
   get "/subjects/:subject/versions/:version" do
+    schema, schema_id = schema_and_id_at_subject_and_version
     schema_ids = SUBJECTS[params[:subject]]
-    halt(404, SUBJECT_NOT_FOUND) if schema_ids.empty?
-
-    schema_id = if params[:version] == 'latest'
-                  schema_ids.last
-                else
-                  schema_ids.at(Integer(params[:version]) - 1)
-                end
-    halt(404, VERSION_NOT_FOUND) unless schema_id
-
-    schema = SCHEMAS.at(schema_id)
 
     {
       name: params[:subject],
@@ -107,9 +113,14 @@ class FakeConfluentSchemaRegistryServer < Sinatra::Base
   end
 
   post "/compatibility/subjects/:subject/versions/:version" do
-    # The ruby avro gem does not yet include a compatibility check between schemas.
-    # See https://github.com/apache/avro/pull/170
-    raise NotImplementedError
+    schema, _schema_id = schema_and_id_at_subject_and_version
+    old_schema = Avro::Schema.parse(schema)
+    new_schema = Avro::Schema.parse(parse_schema)
+
+    result = Avro::SchemaCompatibility.can_read?(old_schema, new_schema)
+    {
+      is_compatible: result
+    }.to_json
   end
 
   get "/config" do
