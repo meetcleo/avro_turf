@@ -52,6 +52,8 @@ class AvroTurf::ConnectionWrapper
       url,
       headers: headers,
       user: user,
+      tcp_nodelay: true,
+      persistent: true,
       password: password,
       ssl_ca_file: ssl_ca_file,
       client_cert: client_cert,
@@ -62,5 +64,6 @@ class AvroTurf::ConnectionWrapper
     )
   end
 
-  attr_reader :logger, :proxy, :url, :user, :password, :ssl_ca_file, :client_cert, :client_key, :client_key_pass, :client_cert_data, :client_key_data
+  attr_reader :logger, :proxy, :url, :user, :password, :ssl_ca_file, :client_cert, :client_key, :client_key_pass,
+              :client_cert_data, :client_key_data
 end
