@@ -1,8 +1,6 @@
-require 'excon'
+require 'avro_turf/connection_manager'
 
 class AvroTurf::ConfluentSchemaRegistry
-  CONTENT_TYPE = "application/vnd.schemaregistry.v1+json".freeze
-
   def initialize(
     url,
     logger: Logger.new($stdout),
@@ -15,17 +13,17 @@ class AvroTurf::ConfluentSchemaRegistry
     client_key_pass: nil,
     client_cert_data: nil,
     client_key_data: nil,
+    oauth_url: nil,
+    oauth_client_id: nil,
+    oauth_client_secret: nil,
     path_prefix: nil
   )
     @path_prefix = path_prefix
     @logger = logger
-    headers = Excon.defaults[:headers].merge(
-      "Content-Type" => CONTENT_TYPE
-    )
-    headers[:proxy] = proxy unless proxy.nil?
-    @connection = Excon.new(
+    @connection_manager = ::AvroTurf::ConnectionManager.new(
       url,
-      headers: headers,
+      logger: logger,
+      proxy: proxy,
       user: user,
       password: password,
       ssl_ca_file: ssl_ca_file,
@@ -33,20 +31,23 @@ class AvroTurf::ConfluentSchemaRegistry
       client_key: client_key,
       client_key_pass: client_key_pass,
       client_cert_data: client_cert_data,
-      client_key_data: client_key_data
+      client_key_data: client_key_data,
+      oauth_url: oauth_url,
+      oauth_client_id: oauth_client_id,
+      oauth_client_secret: oauth_client_secret
     )
   end
 
   def fetch(id)
     @logger.info "Fetching schema with id #{id}"
     data = get("/schemas/ids/#{id}")
-    data.fetch("schema")
+    data.fetch('schema')
   end
 
   def register(subject, schema)
     data = post("/subjects/#{subject}/versions", body: { schema: schema.to_s }.to_json)
 
-    id = data.fetch("id")
+    id = data.fetch('id')
 
     @logger.info "Registered schema for subject `#{subject}`; id = #{id}"
 
@@ -73,7 +74,7 @@ class AvroTurf::ConfluentSchemaRegistry
     data = post("/subjects/#{subject}",
                 expects: [200, 404],
                 body: { schema: schema.to_s }.to_json)
-    data unless data.has_key?("error_code")
+    data unless data.has_key?('error_code')
   end
 
   # Check if a schema is compatible with the stored version.
@@ -90,12 +91,12 @@ class AvroTurf::ConfluentSchemaRegistry
 
   # Get global config
   def global_config
-    get("/config")
+    get('/config')
   end
 
   # Update global config
   def update_global_config(config)
-    put("/config", body: config.to_json)
+    put('/config', body: config.to_json)
   end
 
   # Get config for subject
@@ -106,6 +107,11 @@ class AvroTurf::ConfluentSchemaRegistry
   # Update config for subject
   def update_subject_config(subject, config)
     put("/config/#{subject}", body: config.to_json)
+  end
+
+  # Delete all versions for a subject
+  def delete_subject(subject)
+    delete("/subjects/#{subject}")
   end
 
   private
@@ -122,10 +128,16 @@ class AvroTurf::ConfluentSchemaRegistry
     request(path, method: :post, **options)
   end
 
+  def delete(path, **options)
+    request(path, method: :delete, **options)
+  end
+
   def request(path, **options)
-    options = { expects: 200 }.merge!(options)
-    path = File.join(@path_prefix, path) unless @path_prefix.nil?
-    response = @connection.request(path: path, **options)
-    JSON.parse(response.body)
+    @connection_manager.with_connection do |connection|
+      options = { expects: 200 }.merge!(options)
+      path = File.join(@path_prefix, path) unless @path_prefix.nil?
+      response = connection.request(path: path, **options)
+      JSON.parse(response.body)
+    end
   end
 end
