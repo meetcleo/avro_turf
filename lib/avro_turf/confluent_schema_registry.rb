@@ -133,7 +133,7 @@ class AvroTurf::ConfluentSchemaRegistry
   private
 
   def get(path, **options)
-    options = retry_options.merge!(options)
+    options.merge!(retry_options)
     request(path, method: :get, **options)
   end
 
