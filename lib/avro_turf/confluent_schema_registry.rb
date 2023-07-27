@@ -38,6 +38,22 @@ class AvroTurf::ConfluentSchemaRegistry
     )
   end
 
+  RETRY_ERRORS = [
+    Excon::Error::Timeout,
+    Excon::Error::Socket,
+    Excon::Error::BadGateway,
+    Excon::Error::ServiceUnavailable,
+    Excon::Error::GatewayTimeout
+  ].freeze
+  private_constant :RETRY_ERRORS
+
+  def retry_options
+    {
+      idempotent: true,
+      retry_errors: RETRY_ERRORS
+    }
+  end
+
   def fetch(id)
     @logger.info "Fetching schema with id #{id}"
     data = get("/schemas/ids/#{id}")
@@ -117,6 +133,7 @@ class AvroTurf::ConfluentSchemaRegistry
   private
 
   def get(path, **options)
+    options.merge!(retry_options)
     request(path, method: :get, **options)
   end
 
