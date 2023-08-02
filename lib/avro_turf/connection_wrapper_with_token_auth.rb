@@ -14,6 +14,9 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
                  client_key_pass: nil,
                  client_cert_data: nil,
                  client_key_data: nil,
+                 connection_pool_size: nil,
+                 tcp_nodelay: nil,
+                 persistent_connection: nil,
                  oauth_url: nil,
                  oauth_client_id: nil,
                  oauth_client_secret: nil)
@@ -34,7 +37,10 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       client_key: client_key,
       client_key_pass: client_key_pass,
       client_cert_data: client_cert_data,
-      client_key_data: client_key_data)
+      client_key_data: client_key_data,
+      connection_pool_size: connection_pool_size,
+      tcp_nodelay: tcp_nodelay,
+      persistent_connection: persistent_connection)
   end
 
   def with_connection
@@ -64,7 +70,8 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       refresh_uri = URI.parse(oauth_url)
       refresh_connection = Excon.new(
         refresh_uri.to_s.chomp(refresh_uri.path),
-        headers: refresh_token_header)
+        headers: refresh_token_header
+      )
       response = refresh_connection.post(path: refresh_uri.path, expects: 200, body: 'grant_type=client_credentials')
       json_response = JSON.parse(response.body)
       @token = json_response['access_token']
@@ -72,7 +79,7 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       remove_instance_variable(:@connection) if instance_variable_defined?(:@connection)
       logger.info("Auth token refreshed (new token set to expire at #{token_expires_at}).")
     end
-  rescue => e
+  rescue StandardError => e
     logger.error('Exception whilst refreshing token:')
     logger.error(e)
   end
@@ -92,9 +99,10 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
   def refresh_token_header
     {
       'Authorization' => "Basic #{base64_refresh_auth}",
-      'Content-Type' => 'application/x-www-form-urlencoded',
+      'Content-Type' => 'application/x-www-form-urlencoded'
     }
   end
 
-  attr_reader :oauth_url, :oauth_client_id, :oauth_client_secret, :token_expires_at, :semaphore, :token, :refresh_token_retries_remaining
+  attr_reader :oauth_url, :oauth_client_id, :oauth_client_secret, :token_expires_at, :semaphore, :token,
+              :refresh_token_retries_remaining
 end
