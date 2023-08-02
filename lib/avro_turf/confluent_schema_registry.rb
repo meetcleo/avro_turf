@@ -16,7 +16,10 @@ class AvroTurf::ConfluentSchemaRegistry
     oauth_url: nil,
     oauth_client_id: nil,
     oauth_client_secret: nil,
-    path_prefix: nil
+    path_prefix: nil,
+    connection_pool_size: nil,
+    tcp_nodelay: nil,
+    persistent_connection: nil
   )
     @path_prefix = path_prefix
     @logger = logger
@@ -34,7 +37,10 @@ class AvroTurf::ConfluentSchemaRegistry
       client_key_data: client_key_data,
       oauth_url: oauth_url,
       oauth_client_id: oauth_client_id,
-      oauth_client_secret: oauth_client_secret
+      oauth_client_secret: oauth_client_secret,
+      connection_pool_size: connection_pool_size,
+      tcp_nodelay: tcp_nodelay,
+      persistent_connection: persistent_connection
     )
   end
 
