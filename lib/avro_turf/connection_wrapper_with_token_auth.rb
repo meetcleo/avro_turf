@@ -14,6 +14,9 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
                  client_key_pass: nil,
                  client_cert_data: nil,
                  client_key_data: nil,
+                 connection_pool_size: nil,
+                 tcp_nodelay: nil,
+                 persistent_connection: nil,
                  oauth_url: nil,
                  oauth_client_id: nil,
                  oauth_client_secret: nil)
@@ -34,7 +37,10 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       client_key: client_key,
       client_key_pass: client_key_pass,
       client_cert_data: client_cert_data,
-      client_key_data: client_key_data)
+      client_key_data: client_key_data,
+      connection_pool_size: connection_pool_size,
+      tcp_nodelay: tcp_nodelay,
+      persistent_connection: persistent_connection)
   end
 
   def with_connection

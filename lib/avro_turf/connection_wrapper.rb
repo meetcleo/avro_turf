@@ -82,5 +82,5 @@ class AvroTurf::ConnectionWrapper
     end
   end
   attr_reader :logger, :proxy, :url, :user, :password, :ssl_ca_file, :client_cert, :client_key, :client_key_pass,
-              :client_cert_data, :client_key_data, :connection_pool_size
+              :client_cert_data, :client_key_data, :connection_pool_size, :tcp_nodelay, :persistent_connection
 end
