@@ -1,9 +1,13 @@
 # frozen_string_literal: true
 
 require 'excon'
+require 'connection_pool'
 
 class AvroTurf::ConnectionWrapper
   CONTENT_TYPE = 'application/vnd.schemaregistry.v1+json'
+  CONNECTION_POOL_SIZE = 1
+  TCP_NODELAY = true
+  PERSISTENT_CONNECTION = true
 
   def initialize(
     url,
@@ -16,7 +20,10 @@ class AvroTurf::ConnectionWrapper
     client_key: nil,
     client_key_pass: nil,
     client_cert_data: nil,
-    client_key_data: nil
+    client_key_data: nil,
+    connection_pool_size: nil,
+    tcp_nodelay: nil,
+    persistent_connection: nil
   )
     @logger = logger
     @proxy = proxy
@@ -29,10 +36,15 @@ class AvroTurf::ConnectionWrapper
     @client_key_pass = client_key_pass
     @client_cert_data = client_cert_data
     @client_key_data = client_key_data
+    @connection_pool_size = connection_pool_size || CONNECTION_POOL_SIZE
+    @tcp_nodelay = tcp_nodelay || TCP_NODELAY
+    @persistent_connection = persistent_connection || PERSISTENT_CONNECTION
   end
 
   def with_connection
-    yield connection
+    connection_pool.with do |conn|
+      yield conn
+    end
   end
 
   attr_reader :connection
@@ -48,12 +60,12 @@ class AvroTurf::ConnectionWrapper
   end
 
   def connection
-    @connection ||= Excon.new(
+    Excon.new(
       url,
       headers: headers,
       user: user,
-      tcp_nodelay: true,
-      persistent: true,
+      tcp_nodelay: tcp_nodelay,
+      persistent: persistent_connection,
       password: password,
       ssl_ca_file: ssl_ca_file,
       client_cert: client_cert,
@@ -64,6 +76,11 @@ class AvroTurf::ConnectionWrapper
     )
   end
 
+  def connection_pool
+    @connection_pool ||= ConnectionPool.new(size: connection_pool_size) do
+      connection
+    end
+  end
   attr_reader :logger, :proxy, :url, :user, :password, :ssl_ca_file, :client_cert, :client_key, :client_key_pass,
-              :client_cert_data, :client_key_data
+              :client_cert_data, :client_key_data, :connection_pool_size
 end

@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-require 'connection_pool'
 class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
   REFRESH_TOKEN_TRIES = 4
-  CONNECTION_POOL_SIZE = 1
 
   def initialize(url,
                  logger:,
@@ -18,15 +16,13 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
                  client_key_data: nil,
                  oauth_url: nil,
                  oauth_client_id: nil,
-                 oauth_client_secret: nil,
-                 connection_pool_size: nil)
+                 oauth_client_secret: nil)
     @oauth_url = oauth_url
     @oauth_client_id = oauth_client_id
     @oauth_client_secret = oauth_client_secret
     @semaphore = Mutex.new
     @logger = logger
     @refresh_token_retries_remaining = REFRESH_TOKEN_TRIES
-    @connection_pool_size = connection_pool_size || CONNECTION_POOL_SIZE
 
     super(url,
       logger: logger,
@@ -43,9 +39,7 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
 
   def with_connection
     refresh_token if token_needs_refresh?
-    result = connection_pool.with do |conn|
-      yield conn
-    end
+    result = super
     @refresh_token_retries_remaining = REFRESH_TOKEN_TRIES
     result
   rescue Excon::Error::Unauthorized
@@ -103,12 +97,6 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
     }
   end
 
-  def connection_pool
-    @connection_pool ||= ConnectionPool.new(size: connection_pool_size) do
-      connection
-    end
-  end
-
   attr_reader :oauth_url, :oauth_client_id, :oauth_client_secret, :token_expires_at, :semaphore, :token,
-              :refresh_token_retries_remaining, :connection_pool_size
+              :refresh_token_retries_remaining
 end
