@@ -76,7 +76,6 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       json_response = JSON.parse(response.body)
       @token = json_response['access_token']
       @token_expires_at = current_time_utc + json_response['expires_in'].to_i
-      remove_instance_variable(:@connection) if instance_variable_defined?(:@connection)
       logger.info("Auth token refreshed (new token set to expire at #{token_expires_at}).")
     end
   rescue StandardError => e
