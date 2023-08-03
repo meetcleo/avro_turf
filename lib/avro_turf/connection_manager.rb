@@ -62,8 +62,8 @@ class AvroTurf::ConnectionManager
     logger.debug("#{self.class.name}: using #{connection_wrapper.class.name} connection wrapper")
   end
 
-  def with_connection(&block)
-    connection_wrapper.with_connection(&block)
+  def with_connection
+    yield connection_wrapper
   end
 
   private

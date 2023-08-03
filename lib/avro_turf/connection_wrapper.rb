@@ -47,7 +47,14 @@ class AvroTurf::ConnectionWrapper
     end
   end
 
-  attr_reader :connection
+  def request(path:, **options)
+    with_connection do |conn|
+      options = { headers: headers }.merge!(options)
+      conn.request(path: path, **options)
+    end
+  end
+
+  attr_reader :connection_pool
 
   private
 
