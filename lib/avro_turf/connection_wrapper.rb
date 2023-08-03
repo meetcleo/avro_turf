@@ -84,7 +84,7 @@ class AvroTurf::ConnectionWrapper
   end
 
   def connection_pool
-    @connection_pool ||= ConnectionPool.new(size: connection_pool_size) do
+    @connection_pool ||= ConnectionPool.new(connection_pool_size) do
       connection
     end
   end
