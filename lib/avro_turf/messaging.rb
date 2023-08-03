@@ -76,7 +76,8 @@ class AvroTurf
       oauth_client_secret: nil,
       connection_pool_size: nil,
       tcp_nodelay: nil,
-      persistent_connection: nil
+      persistent_connection: nil,
+      cache: nil
     )
       @logger = logger || Logger.new($stderr)
       @namespace = namespace
@@ -101,7 +102,8 @@ class AvroTurf
           connection_pool_size: connection_pool_size,
           tcp_nodelay: tcp_nodelay,
           persistent_connection: persistent_connection
-        )
+        ),
+        cache: cache
       )
       @schemas_by_id = {}
     end
