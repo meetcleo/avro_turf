@@ -37,8 +37,8 @@ class AvroTurf::ConnectionWrapper
     @client_cert_data = client_cert_data
     @client_key_data = client_key_data
     @connection_pool_size = connection_pool_size || CONNECTION_POOL_SIZE
-    @tcp_nodelay = tcp_nodelay || TCP_NODELAY
-    @persistent_connection = persistent_connection || PERSISTENT_CONNECTION
+    @tcp_nodelay = tcp_nodelay.nil? ? TCP_NODELAY : tcp_nodelay
+    @persistent_connection = persistent_connection.nil? ? PERSISTENT_CONNECTION : persistent_connection
   end
 
   def with_connection
