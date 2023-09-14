@@ -127,7 +127,7 @@ class AvroTurf
     # validate          - The boolean for performing complete message validation before
     #                     encoding it, Avro::SchemaValidator::ValidationError with
     #                     a descriptive message will be raised in case of invalid message.
-    # validate_if_error - The boolean for performing complete message validation only after an error, Avro::SchemaValidator::ValidationError with
+    # validate_if_error - The boolean for performing complete message validation after an error; works only if validate is set to false, Avro::SchemaValidator::ValidationError with
     #                     a descriptive message will be raised in case of invalid message.
     # register          - The boolean for determining if registering a new schema is allowed
     #                     when encoding a message
