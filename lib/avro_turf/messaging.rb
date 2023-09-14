@@ -231,7 +231,9 @@ class AvroTurf
     def fetch_schema_by_id(schema_id)
       schema = @schemas_by_id.fetch(schema_id) do
         schema_json = @registry.fetch(schema_id)
-        Avro::Schema.parse(schema_json)
+        schema = Avro::Schema.parse(schema_json)
+        @schemas_by_id[schema_id] = schema
+        schema
       end
       [schema, schema_id]
     end
