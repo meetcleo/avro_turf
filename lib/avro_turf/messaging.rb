@@ -1,4 +1,5 @@
 require 'logger'
+require 'concurrent/map'
 require 'avro_turf'
 require 'avro_turf/schema_store'
 require 'avro_turf/confluent_schema_registry'
@@ -105,7 +106,7 @@ class AvroTurf
         ),
         cache: cache
       )
-      @schemas_by_id = {}
+      @schemas_by_id = Concurrent::Map.new
     end
 
     attr_accessor :schema_store

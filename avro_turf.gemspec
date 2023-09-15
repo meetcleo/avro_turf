@@ -21,6 +21,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'avro', '>= 1.7.7', '< 1.12'
   spec.add_dependency 'excon', '~> 0.71'
   spec.add_dependency 'connection_pool'
+  spec.add_dependency 'concurrent-ruby'
 
   spec.add_development_dependency 'bundler', '~> 2.0'
   spec.add_development_dependency 'rake', '~> 13.0'
