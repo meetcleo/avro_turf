@@ -107,7 +107,7 @@ class AvroTurf::ConfluentSchemaRegistry
   # http://docs.confluent.io/3.1.2/schema-registry/docs/api.html#compatibility
   def compatible?(subject, schema, version = 'latest')
     data = post("/compatibility/subjects/#{subject}/versions/#{version}",
-                expects: [200, 404], body: { schema: schema.to_s }.to_json)
+                expects: [200, 404], body: { schema: schema.to_s }.to_json, **retry_options)
     data.fetch('is_compatible', false) unless data.has_key?('error_code')
   end
 
