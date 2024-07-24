@@ -19,10 +19,16 @@ class AvroTurf::ConfluentSchemaRegistry
     path_prefix: nil,
     connection_pool_size: nil,
     tcp_nodelay: nil,
-    persistent_connection: nil
+    persistent_connection: nil,
+    connect_timeout: nil,
+    read_timeout: nil,
+    write_timeout: nil,
+    retry_limit: nil,
+    instrumentor: nil
   )
     @path_prefix = path_prefix
     @logger = logger
+    @retry_limit = retry_limit
     @connection_manager = ::AvroTurf::ConnectionManager.new(
       url,
       logger: logger,
@@ -40,7 +46,11 @@ class AvroTurf::ConfluentSchemaRegistry
       oauth_client_secret: oauth_client_secret,
       connection_pool_size: connection_pool_size,
       tcp_nodelay: tcp_nodelay,
-      persistent_connection: persistent_connection
+      persistent_connection: persistent_connection,
+      connect_timeout: connect_timeout,
+      read_timeout: read_timeout,
+      write_timeout: write_timeout,
+      instrumentor: instrumentor
     )
   end
 
@@ -56,7 +66,8 @@ class AvroTurf::ConfluentSchemaRegistry
   def retry_options
     {
       idempotent: true,
-      retry_errors: RETRY_ERRORS
+      retry_errors: RETRY_ERRORS,
+      retry_limit:,
     }
   end
 
@@ -137,6 +148,8 @@ class AvroTurf::ConfluentSchemaRegistry
   end
 
   private
+
+  attr_reader :retry_limit
 
   def get(path, **options)
     options.merge!(retry_options)

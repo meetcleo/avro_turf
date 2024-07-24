@@ -21,6 +21,9 @@ class AvroTurf
   # 1: https://github.com/confluentinc/schema-registry
   class Messaging
     MAGIC_BYTE = [0].pack('C').freeze
+    DEFAULT_CONNECT_TIMEOUT = 5
+    DEFAULT_API_TIMEOUT = 60
+    DEFAULT_RETRY_LIMIT = 4
 
     class DecodedMessage
       attr_reader :schema_id, :writer_schema, :reader_schema, :message
@@ -78,7 +81,12 @@ class AvroTurf
       connection_pool_size: nil,
       tcp_nodelay: nil,
       persistent_connection: nil,
-      cache: nil
+      cache: nil,
+      connect_timeout: nil,
+      read_timeout: nil,
+      write_timeout: nil,
+      retry_limit: nil,
+      instrumentor: nil
     )
       @logger = logger || Logger.new($stderr)
       @namespace = namespace
@@ -102,7 +110,12 @@ class AvroTurf
           path_prefix: registry_path_prefix,
           connection_pool_size: connection_pool_size,
           tcp_nodelay: tcp_nodelay,
-          persistent_connection: persistent_connection
+          persistent_connection: persistent_connection,
+          connect_timeout: connect_timeout || DEFAULT_CONNECT_TIMEOUT,
+          read_timeout: read_timeout || DEFAULT_API_TIMEOUT,
+          write_timeout: write_timeout || DEFAULT_API_TIMEOUT,
+          retry_limit: retry_limit || DEFAULT_RETRY_LIMIT,
+          instrumentor: instrumentor
         ),
         cache: cache
       )

@@ -23,7 +23,11 @@ class AvroTurf::ConnectionWrapper
     client_key_data: nil,
     connection_pool_size: nil,
     tcp_nodelay: nil,
-    persistent_connection: nil
+    persistent_connection: nil,
+    connect_timeout: nil,
+    read_timeout: nil,
+    write_timeout: nil,
+    instrumentor: nil
   )
     @logger = logger
     @proxy = proxy
@@ -39,6 +43,10 @@ class AvroTurf::ConnectionWrapper
     @connection_pool_size = connection_pool_size || CONNECTION_POOL_SIZE
     @tcp_nodelay = tcp_nodelay.nil? ? TCP_NODELAY : tcp_nodelay
     @persistent_connection = persistent_connection.nil? ? PERSISTENT_CONNECTION : persistent_connection
+    @connect_timeout = connect_timeout
+    @read_timeout = read_timeout
+    @write_timeout = write_timeout
+    @instrumentor = instrumentor
   end
 
   def with_connection
@@ -67,8 +75,7 @@ class AvroTurf::ConnectionWrapper
   end
 
   def connection
-    Excon.new(
-      url,
+    options = {
       headers: headers,
       user: user,
       tcp_nodelay: tcp_nodelay,
@@ -79,7 +86,15 @@ class AvroTurf::ConnectionWrapper
       client_key: client_key,
       client_key_pass: client_key_pass,
       client_cert_data: client_cert_data,
-      client_key_data: client_key_data
+      client_key_data: client_key_data,
+      connect_timeout: connect_timeout,
+      read_timeout: read_timeout,
+      write_timeout: write_timeout
+    }
+    options[:instrumentor] = instrumentor if instrumentor
+    Excon.new(
+      url,
+      options
     )
   end
 
@@ -89,5 +104,6 @@ class AvroTurf::ConnectionWrapper
     end
   end
   attr_reader :logger, :proxy, :url, :user, :password, :ssl_ca_file, :client_cert, :client_key, :client_key_pass,
-              :client_cert_data, :client_key_data, :connection_pool_size, :tcp_nodelay, :persistent_connection
+              :client_cert_data, :client_key_data, :connection_pool_size, :tcp_nodelay, :persistent_connection,
+              :connect_timeout, :read_timeout, :write_timeout, :instrumentor
 end
