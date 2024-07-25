@@ -18,7 +18,11 @@ class AvroTurf::ConnectionManager
                  oauth_client_secret: nil,
                  connection_pool_size: nil,
                  tcp_nodelay: nil,
-                 persistent_connection: nil)
+                 persistent_connection: nil,
+                 connect_timeout: nil,
+                 read_timeout: nil,
+                 write_timeout: nil,
+                 instrumentor: nil)
     @logger = logger
 
     @connection_wrapper = if [oauth_client_id, oauth_client_secret].none?(&:nil?)
@@ -39,7 +43,11 @@ class AvroTurf::ConnectionManager
                               oauth_client_secret: oauth_client_secret,
                               connection_pool_size: connection_pool_size,
                               tcp_nodelay: tcp_nodelay,
-                              persistent_connection: persistent_connection
+                              persistent_connection: persistent_connection,
+                              connect_timeout: connect_timeout,
+                              read_timeout: read_timeout,
+                              write_timeout: write_timeout,
+                              instrumentor: instrumentor
                             )
                           else
                             ::AvroTurf::ConnectionWrapper.new(
@@ -56,7 +64,11 @@ class AvroTurf::ConnectionManager
                               client_key_data: client_key_data,
                               connection_pool_size: connection_pool_size,
                               tcp_nodelay: tcp_nodelay,
-                              persistent_connection: persistent_connection
+                              persistent_connection: persistent_connection,
+                              connect_timeout: connect_timeout,
+                              read_timeout: read_timeout,
+                              write_timeout: write_timeout,
+                              instrumentor: instrumentor
                             )
                           end
     logger.debug("#{self.class.name}: using #{connection_wrapper.class.name} connection wrapper")

@@ -19,7 +19,11 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
                  persistent_connection: nil,
                  oauth_url: nil,
                  oauth_client_id: nil,
-                 oauth_client_secret: nil)
+                 oauth_client_secret: nil,
+                 connect_timeout: nil,
+                 read_timeout: nil,
+                 write_timeout: nil,
+                 instrumentor: nil)
     @oauth_url = oauth_url
     @oauth_client_id = oauth_client_id
     @oauth_client_secret = oauth_client_secret
@@ -40,7 +44,11 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       client_key_data: client_key_data,
       connection_pool_size: connection_pool_size,
       tcp_nodelay: tcp_nodelay,
-      persistent_connection: persistent_connection)
+      persistent_connection: persistent_connection,
+      connect_timeout: connect_timeout,
+      read_timeout: read_timeout,
+      write_timeout: write_timeout,
+      instrumentor: instrumentor)
   end
 
   def with_connection
@@ -68,9 +76,14 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       logger.info('Auth token needs refresh. Refreshing...')
       current_time_utc = Time.now.utc
       refresh_uri = URI.parse(oauth_url)
+      options = {
+        headers: refresh_token_header,
+      }
+      options[:instrumentor] = instrumentor if instrumentor
+
       refresh_connection = Excon.new(
         refresh_uri.to_s.chomp(refresh_uri.path),
-        headers: refresh_token_header
+        options
       )
       response = refresh_connection.post(path: refresh_uri.path, expects: 200, body: 'grant_type=client_credentials')
       json_response = JSON.parse(response.body)
