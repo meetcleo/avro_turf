@@ -72,7 +72,7 @@ class AvroTurf::ConfluentSchemaRegistry
   end
 
   def fetch(id)
-    @logger.info "Fetching schema with id #{id}"
+    @logger.debug "Fetching schema with id #{id}"
     data = get("/schemas/ids/#{id}")
     data.fetch('schema')
   end
@@ -82,7 +82,7 @@ class AvroTurf::ConfluentSchemaRegistry
 
     id = data.fetch('id')
 
-    @logger.info "Registered schema for subject `#{subject}`; id = #{id}"
+    @logger.debug "Registered schema for subject `#{subject}`; id = #{id}"
 
     id
   end
