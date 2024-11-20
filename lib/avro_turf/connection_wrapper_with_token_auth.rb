@@ -59,7 +59,7 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
   rescue Excon::Error::Unauthorized
     raise if refresh_token_retries_remaining < 1
 
-    logger.info("Encountered unauthorised response, will retry with fresh token (#{refresh_token_retries_remaining} retries remaining)...")
+    logger.debug("Encountered unauthorised response, will retry with fresh token (#{refresh_token_retries_remaining} retries remaining)...")
     refresh_token
     retry
   end
@@ -67,13 +67,13 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
   private
 
   def refresh_token
-    logger.info('Waiting to refresh auth token...')
+    logger.debug('Waiting to refresh auth token...')
     semaphore.synchronize do
       @refresh_token_retries_remaining -= 1
-      logger.info("Checking if auth token needs refresh (current token set to expire at #{token_expires_at})...")
+      logger.debug("Checking if auth token needs refresh (current token set to expire at #{token_expires_at})...")
       return unless token_needs_refresh?
 
-      logger.info('Auth token needs refresh. Refreshing...')
+      logger.debug('Auth token needs refresh. Refreshing...')
       current_time_utc = Time.now.utc
       refresh_uri = URI.parse(oauth_url)
       options = {
@@ -89,7 +89,7 @@ class AvroTurf::ConnectionWrapperWithAuthToken < AvroTurf::ConnectionWrapper
       json_response = JSON.parse(response.body)
       @token = json_response['access_token']
       @token_expires_at = current_time_utc + json_response['expires_in'].to_i
-      logger.info("Auth token refreshed (new token set to expire at #{token_expires_at}).")
+      logger.debug("Auth token refreshed (new token set to expire at #{token_expires_at}).")
     end
   rescue StandardError => e
     logger.error('Exception whilst refreshing token:')

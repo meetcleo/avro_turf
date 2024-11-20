@@ -294,12 +294,12 @@ shared_examples_for 'a confluent schema registry client' do |auth_mechanism|
       it 'tries to fetch a new authorization token 3 times' do
         skip('Not using oauth') if auth_mechanism != 'oauth'
 
-        allow(logger).to receive(:info)
+        allow(logger).to receive(:debug)
         expect { registry.subject_config('unauthorized') }.to raise_error(Excon::Error::Unauthorized)
 
-        expect(logger).to have_received(:info).with('Encountered unauthorised response, will retry with fresh token (3 retries remaining)...').exactly(1).times
-        expect(logger).to have_received(:info).with('Encountered unauthorised response, will retry with fresh token (2 retries remaining)...').exactly(1).times
-        expect(logger).to have_received(:info).with('Encountered unauthorised response, will retry with fresh token (1 retries remaining)...').exactly(1).times
+        expect(logger).to have_received(:debug).with('Encountered unauthorised response, will retry with fresh token (3 retries remaining)...').exactly(1).times
+        expect(logger).to have_received(:debug).with('Encountered unauthorised response, will retry with fresh token (2 retries remaining)...').exactly(1).times
+        expect(logger).to have_received(:debug).with('Encountered unauthorised response, will retry with fresh token (1 retries remaining)...').exactly(1).times
       end
     end
   end
