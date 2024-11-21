@@ -1,4 +1,5 @@
 require 'logger'
+require 'concurrent/map'
 require 'avro_turf'
 require 'avro_turf/schema_store'
 require 'avro_turf/confluent_schema_registry'
@@ -10,7 +11,6 @@ require 'avro_turf/schema_registry'
 require 'avro_turf/cached_schema_registry'
 
 class AvroTurf
-
   # Provides a way to encode and decode messages without having to embed schemas
   # in the encoded data. Confluent's Schema Registry[1] is used to register
   # a schema when encoding a message -- the registry will issue a schema id that
@@ -20,13 +20,13 @@ class AvroTurf
   #
   # 1: https://github.com/confluentinc/schema-registry
   class Messaging
-    MAGIC_BYTE = [0].pack("C").freeze
+    MAGIC_BYTE = [0].pack('C').freeze
+    DEFAULT_CONNECT_TIMEOUT = 5
+    DEFAULT_API_TIMEOUT = 60
+    DEFAULT_RETRY_LIMIT = 4
 
     class DecodedMessage
-      attr_reader :schema_id
-      attr_reader :writer_schema
-      attr_reader :reader_schema
-      attr_reader :message
+      attr_reader :schema_id, :writer_schema, :reader_schema, :message
 
       def initialize(schema_id, writer_schema, reader_schema, message)
         @schema_id = schema_id
@@ -77,7 +77,16 @@ class AvroTurf
       client_key_data: nil,
       oauth_url: nil,
       oauth_client_id: nil,
-      oauth_client_secret: nil
+      oauth_client_secret: nil,
+      connection_pool_size: nil,
+      tcp_nodelay: nil,
+      persistent_connection: nil,
+      cache: nil,
+      connect_timeout: nil,
+      read_timeout: nil,
+      write_timeout: nil,
+      retry_limit: nil,
+      instrumentor: nil
     )
       @logger = logger || Logger.new($stderr)
       @namespace = namespace
@@ -98,10 +107,19 @@ class AvroTurf
           oauth_url: oauth_url,
           oauth_client_id: oauth_client_id,
           oauth_client_secret: oauth_client_secret,
-          path_prefix: registry_path_prefix
-        )
+          path_prefix: registry_path_prefix,
+          connection_pool_size: connection_pool_size,
+          tcp_nodelay: tcp_nodelay,
+          persistent_connection: persistent_connection,
+          connect_timeout: connect_timeout || DEFAULT_CONNECT_TIMEOUT,
+          read_timeout: read_timeout || DEFAULT_API_TIMEOUT,
+          write_timeout: write_timeout || DEFAULT_API_TIMEOUT,
+          retry_limit: retry_limit || DEFAULT_RETRY_LIMIT,
+          instrumentor: instrumentor
+        ),
+        cache: cache
       )
-      @schemas_by_id = {}
+      @schemas_by_id = Concurrent::Map.new
     end
 
     attr_accessor :schema_store
@@ -109,34 +127,37 @@ class AvroTurf
 
     # Encodes a message using the specified schema.
     #
-    # message     - The message that should be encoded. Must be compatible with
-    #               the schema.
-    # schema_name - The String name of the schema that should be used to encode
-    #               the data.
-    # namespace   - The namespace of the schema (optional).
-    # subject     - The subject name the schema should be registered under in
-    #               the schema registry (optional).
-    # version     - The integer version of the schema that should be used to decode
-    #               the data. Must match the schema used when encoding (optional).
-    # schema_id   - The integer id of the schema that should be used to encode
-    #               the data.
-    # validate    - The boolean for performing complete message validation before
-    #               encoding it, Avro::SchemaValidator::ValidationError with
-    #               a descriptive message will be raised in case of invalid message.
-    # register    - The boolean for determining if registering a new schema is allowed
-    #               when encoding a message
+    # message           - The message that should be encoded. Must be compatible with
+    #                     the schema.
+    # schema_name       - The String name of the schema that should be used to encode
+    #                     the data.
+    # namespace         - The namespace of the schema (optional).
+    # subject           - The subject name the schema should be registered under in
+    #                     the schema registry (optional).
+    # version           - The integer version of the schema that should be used to decode
+    #                     the data. Must match the schema used when encoding (optional).
+    # schema_id         - The integer id of the schema that should be used to encode
+    #                     the data.
+    # validate          - The boolean for performing complete message validation before
+    #                     encoding it, Avro::SchemaValidator::ValidationError with
+    #                     a descriptive message will be raised in case of invalid message.
+    # validate_if_error - The boolean for performing complete message validation after an error; works only if validate is set to false, Avro::SchemaValidator::ValidationError with
+    #                     a descriptive message will be raised in case of invalid message.
+    # register          - The boolean for determining if registering a new schema is allowed
+    #                     when encoding a message
     #
     # Returns the encoded data as a String.
-    def encode(message, schema_name: nil, namespace: @namespace, subject: nil, version: nil, schema_id: nil, validate: false, register: true)
+    def encode(message, schema_name: nil, namespace: @namespace, subject: nil, version: nil, schema_id: nil, validate: false, register: true, validate_if_error: false)
       schema, schema_id = if schema_id
-        fetch_schema_by_id(schema_id)
-      elsif subject && version
-        fetch_schema(subject: subject, version: version)
-      elsif schema_name && register
-        register_schema(subject: subject, schema_name: schema_name, namespace: namespace)
-      else
-        raise ArgumentError.new('Neither schema_name nor schema_id nor subject + version provided to determine the schema.')
-      end
+                            fetch_schema_by_id(schema_id)
+                          elsif subject && version
+                            fetch_schema(subject: subject, version: version)
+                          elsif schema_name && register
+                            register_schema(subject: subject, schema_name: schema_name, namespace: namespace)
+                          else
+                            raise ArgumentError,
+                                  'Neither schema_name nor schema_id nor subject + version provided to determine the schema.'
+                          end
 
       if validate
         Avro::SchemaValidator.validate!(schema, message, recursive: true, encoded: false, fail_on_extra_fields: true)
@@ -150,17 +171,22 @@ class AvroTurf
       encoder.write(MAGIC_BYTE)
 
       # The schema id is encoded as a 4-byte big-endian integer.
-      encoder.write([schema_id].pack("N"))
+      encoder.write([schema_id].pack('N'))
 
       # The actual message comes last.
       writer.write(message, encoder)
 
       stream.string
+
+    rescue Avro::IO::AvroTypeError
+      if validate_if_error && !validate
+        Avro::SchemaValidator.validate!(schema, message, recursive: true, encoded: false, fail_on_extra_fields: true)
+      end
     rescue Excon::Error::NotFound
       if schema_id
-        raise SchemaNotFoundError.new("Schema with id: #{schema_id} is not found on registry")
+        raise SchemaNotFoundError, "Schema with id: #{schema_id} is not found on registry"
       else
-        raise SchemaNotFoundError.new("Schema with subject: `#{subject}` version: `#{version}` is not found on registry")
+        raise SchemaNotFoundError, "Schema with subject: `#{subject}` version: `#{version}` is not found on registry"
       end
     end
 
@@ -194,12 +220,10 @@ class AvroTurf
       # The first byte is MAGIC!!!
       magic_byte = decoder.read(1)
 
-      if magic_byte != MAGIC_BYTE
-        raise "Expected data to begin with a magic byte, got `#{magic_byte.inspect}`"
-      end
+      raise "Expected data to begin with a magic byte, got `#{magic_byte.inspect}`" if magic_byte != MAGIC_BYTE
 
       # The schema id is a 4-byte big-endian integer.
-      schema_id = decoder.read(4).unpack("N").first
+      schema_id = decoder.read(4).unpack1('N')
 
       writers_schema = @schemas_by_id.fetch(schema_id) do
         schema_json = @registry.fetch(schema_id)
@@ -211,7 +235,7 @@ class AvroTurf
 
       DecodedMessage.new(schema_id, writers_schema, readers_schema, message)
     rescue Excon::Error::NotFound
-      raise SchemaNotFoundError.new("Schema with id: #{schema_id} is not found on registry")
+      raise SchemaNotFoundError, "Schema with id: #{schema_id} is not found on registry"
     end
 
     # Providing subject and version to determine the schema,
@@ -228,7 +252,9 @@ class AvroTurf
     def fetch_schema_by_id(schema_id)
       schema = @schemas_by_id.fetch(schema_id) do
         schema_json = @registry.fetch(schema_id)
-        Avro::Schema.parse(schema_json)
+        schema = Avro::Schema.parse(schema_json)
+        @schemas_by_id[schema_id] = schema
+        schema
       end
       [schema, schema_id]
     end
