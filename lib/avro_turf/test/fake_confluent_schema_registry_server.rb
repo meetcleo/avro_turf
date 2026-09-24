@@ -11,6 +11,12 @@ class FakeConfluentSchemaRegistryServer < Sinatra::Base
 
   @global_config = DEFAULT_GLOBAL_CONFIG.dup
 
+  set :host_authorization, ->() do
+    {
+      allow_if: Proc.new { true }
+    }
+  end
+
   class << self
     attr_reader :global_config
   end

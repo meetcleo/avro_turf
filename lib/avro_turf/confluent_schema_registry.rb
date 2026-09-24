@@ -16,10 +16,19 @@ class AvroTurf::ConfluentSchemaRegistry
     oauth_url: nil,
     oauth_client_id: nil,
     oauth_client_secret: nil,
-    path_prefix: nil
+    path_prefix: nil,
+    connection_pool_size: nil,
+    tcp_nodelay: nil,
+    persistent_connection: nil,
+    connect_timeout: nil,
+    read_timeout: nil,
+    write_timeout: nil,
+    retry_limit: nil,
+    instrumentor: nil
   )
     @path_prefix = path_prefix
     @logger = logger
+    @retry_limit = retry_limit
     @connection_manager = ::AvroTurf::ConnectionManager.new(
       url,
       logger: logger,
@@ -34,22 +43,46 @@ class AvroTurf::ConfluentSchemaRegistry
       client_key_data: client_key_data,
       oauth_url: oauth_url,
       oauth_client_id: oauth_client_id,
-      oauth_client_secret: oauth_client_secret
+      oauth_client_secret: oauth_client_secret,
+      connection_pool_size: connection_pool_size,
+      tcp_nodelay: tcp_nodelay,
+      persistent_connection: persistent_connection,
+      connect_timeout: connect_timeout,
+      read_timeout: read_timeout,
+      write_timeout: write_timeout,
+      instrumentor: instrumentor
     )
   end
 
+  RETRY_ERRORS = [
+    Excon::Error::Timeout,
+    Excon::Error::Socket,
+    Excon::Error::BadGateway,
+    Excon::Error::ServiceUnavailable,
+    Excon::Error::GatewayTimeout
+  ].freeze
+  private_constant :RETRY_ERRORS
+
+  def retry_options
+    {
+      idempotent: true,
+      retry_errors: RETRY_ERRORS,
+      retry_limit:,
+    }
+  end
+
   def fetch(id)
-    @logger.info "Fetching schema with id #{id}"
+    @logger.debug "Fetching schema with id #{id}"
     data = get("/schemas/ids/#{id}")
-    data.fetch("schema")
+    data.fetch('schema')
   end
 
   def register(subject, schema)
     data = post("/subjects/#{subject}/versions", body: { schema: schema.to_s }.to_json)
 
-    id = data.fetch("id")
+    id = data.fetch('id')
 
-    @logger.info "Registered schema for subject `#{subject}`; id = #{id}"
+    @logger.debug "Registered schema for subject `#{subject}`; id = #{id}"
 
     id
   end
@@ -74,7 +107,7 @@ class AvroTurf::ConfluentSchemaRegistry
     data = post("/subjects/#{subject}",
                 expects: [200, 404],
                 body: { schema: schema.to_s }.to_json)
-    data unless data.has_key?("error_code")
+    data unless data.has_key?('error_code')
   end
 
   # Check if a schema is compatible with the stored version.
@@ -85,18 +118,18 @@ class AvroTurf::ConfluentSchemaRegistry
   # http://docs.confluent.io/3.1.2/schema-registry/docs/api.html#compatibility
   def compatible?(subject, schema, version = 'latest')
     data = post("/compatibility/subjects/#{subject}/versions/#{version}",
-                expects: [200, 404], body: { schema: schema.to_s }.to_json)
+                expects: [200, 404], body: { schema: schema.to_s }.to_json, **retry_options)
     data.fetch('is_compatible', false) unless data.has_key?('error_code')
   end
 
   # Get global config
   def global_config
-    get("/config")
+    get('/config')
   end
 
   # Update global config
   def update_global_config(config)
-    put("/config", body: config.to_json)
+    put('/config', body: config.to_json)
   end
 
   # Get config for subject
@@ -116,7 +149,10 @@ class AvroTurf::ConfluentSchemaRegistry
 
   private
 
+  attr_reader :retry_limit
+
   def get(path, **options)
+    options.merge!(retry_options)
     request(path, method: :get, **options)
   end
 
