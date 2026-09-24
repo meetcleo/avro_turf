@@ -19,7 +19,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   spec.add_dependency 'avro', '>= 1.7.7', '< 1.12'
-  spec.add_dependency 'excon', '~> 0.71'
+  spec.add_dependency 'excon', '>= 1.5', '< 2'
   spec.add_dependency 'connection_pool'
   spec.add_dependency 'concurrent-ruby'
 
