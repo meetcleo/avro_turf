@@ -44,7 +44,7 @@ shared_examples_for 'a confluent schema registry client' do |auth_mechanism|
           headers: {
             'Authorization' => 'Basic dGVzdCBvYXV0aF9jbGllbnRfaWQ6dGVzdCBvYXV0aF9jbGllbnRfc2VjcmV0',
             'Content-Type' => 'application/x-www-form-urlencoded',
-            'Host' => 'oauth.example.com:443'
+            'Host' => URI.parse(oauth_url).host
           }
         )
         .to_return(status: 200, body: oauth_response, headers: {})
